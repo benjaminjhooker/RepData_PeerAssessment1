@@ -1,0 +1,154 @@
+---
+title: "Exploratory Data Week 2 Project"
+author: "Benjamin J. Hooker"
+date: "September 25, 2017"
+output: html_document
+---
+Load packages for downloading files.  I find the `curl` pacakge to be quite 
+helpful when downloading "https" files
+``` {r, libraries to load}
+
+library(curl)
+library(data.table)
+```
+Download the file, unzip it, and then read it with `read.csv` function to a 
+variable called "data"
+``` {r, downloading}  
+
+file_url <- ("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip")  
+curl_download(file_url, destfile = "./data/week2_proj.zip")  
+data <- read.csv(unzip("./data/week2_proj.zip"))
+
+```
+### Building the histogram:  
+A simple histogram of the data using the `hist` function:
+``` {r, simple hist}
+hist(data$steps, main = "Historam of Steps", xlab = "Number of Steps")
+
+```
+
+When exploring the data using the `table` function, there are 11K+ 0's recorded
+by the device, so it may make more sense to extract the non-zero numbers using
+the `which` function.
+``` {r, the histogram}  
+
+hist(which(data$steps > 0), col = "aquamarine", xlab = "Number of Steps", 
+     main = "Histogram of non-zero steps")
+
+```
+
+### Calculating the mean and median:
+This is probably a good time to use the `tapply` function to generate some data-
+frames and then perform a `cbind` to make one nice table.  
+``` {r, the tapply}
+
+data_average <- as.data.frame(with(data, tapply(steps, date, mean)))
+data_med <- as.data.frame(with(data, tapply(steps, date, median)))
+data_table <- cbind(data_average, data_med)
+colnames(data_table) <- c("Average", "Median")
+data_table
+```
+
+### Plotting steps by interval
+Here again I will use the `tapply` function to generate the time-series analysis
+to try to discover the mean of the steps taken at a given time interval for each
+day.  I had to use an `na.omit` function earlier than expected to display a 
+functional plot.
+``` {r, the plot by interval}
+interval_average <- as.data.frame(with(na.omit(data), tapply(steps, interval, mean)))  
+plot(interval_average, type = "l", col = 4, xlab = "Time interval (by 5 min)",
+     ylab = "Average Steps", main = "Steps by Time interval")
+```
+
+I think I have a fairly good idea of where the highest activity interval is, but 
+I will run an `order` function on the new data frame to see which interval had 
+the greatest number of steps.
+``` {r, interval table}
+df <- interval_average[order(-interval_average),]
+head(df)
+```
+
+### Missing Data
+Calculating the number of "NAs"
+``` {r, count NAs}
+sum(is.na(data))
+```
+
+### Making a data set without "NAs"
+Here I will use the `na.omit` and create a data set that is free of NA's.
+```{r, clean data}
+data1 <- na.omit(data)
+sum(is.na(data1)) ## Check to ensure there are no "NAs"
+```
+
+### Making another Histogram
+With NA's removed, I will remake the previous histograms, but it might be more
+useful to compare them side by side:
+``` {r, histo plots}
+par(mfrow = c(2,2))
+hist(data$steps,main = "Historam of Steps Data", xlab = "Number of Steps")
+hist(data1$steps, col = 3, main = "Historam of Steps Data1",
+     xlab = "Number of Steps")
+hist(which(data$steps > 0), col = "aquamarine", xlab = "Number of Steps", 
+     main = "Histogram of non-zero steps Data")
+hist(which(data1$steps > 0), col = "blue", xlab = "Number of Steps", 
+     main = "Histogram of non-zero steps Data1")
+```
+
+### Another Table
+Here I will use the `tapply` function again, but the code will use the "data1" 
+set instead of the original "data" set.
+``` {r, the tapply again}
+
+data_average1 <- as.data.frame(with(data1, tapply(steps, date, mean)))
+data_med1 <- as.data.frame(with(data1, tapply(steps, date, median)))
+data_table1 <- cbind(data_average1, data_med1)
+colnames(data_table1) <- c("Average1", "Median1")
+data_table1 <- na.omit(data_table1)
+data_table1
+```
+
+### Making Weekends
+First I need to convert the information in the data set to acutal dates using 
+the `as.Date` function in conjunction with `as.character` function and the 
+"format = '%Y-%m-%d'" option.
+``` {r, make the date}
+data1$date <- as.Date(as.character(data1$date), "%Y-%m-%d")
+```
+
+Now I need to create a factor variable in another column to create a table to 
+diferentiate between the two types of days.
+``` {r, for loop}
+data1[,4] <- weekdays(data1$date)
+for(i in 1:nrow(data1)){
+        if (data1[i,4]== "Saturday" | data1[i,4]== "Sunday")
+        {data1[i,5]<-"Weekend"}
+        else {data1[i,5]<-"weekday"
+                }
+}
+```
+
+Weekend factor created, now it is time to make it a factor.
+``` {r, the factor}
+data1$V5 <- as.factor(data1$V5)
+names(data1)[5] <- "Weekend"
+```
+
+Now it is time to subset the data into "Weekdays" and "Weekends"
+``` {r, subsetting}
+weekend <- data1[data1$Weekend == "Weekend",]
+weekday <- data1[data1$Weekend == "weekday",]
+```
+
+Run some `tapply` functions like earlier on the new data frames and then plot 
+the results per the assignment.
+``` {r, plotting again}
+interval_average1 <- as.data.frame(with(na.omit(weekday), tapply(steps, interval,
+                                                                 mean)))
+interval_average2 <- as.data.frame(with(na.omit(weekend), tapply(steps, interval,
+                                                                 mean)))
+par(mfrow = c(2,1))
+plot(interval_average1, type = "l", col = 2, xlab = "Intervals (5 min)",
+     ylab = "Average number of steps", main = "Weekday steps")
+plot(interval_average2, type = "l", col = 4, xlab = "Intervals (5 min)", 
+     ylab = "Average number of steps", main = "Weekend steps")
